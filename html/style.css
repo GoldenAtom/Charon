@@ -1,0 +1,18 @@
+<style> 
+
+body {
+    background-color: #232030;
+    color: white;
+}
+
+header {
+    background-color: darkorange;
+    text-align: center;
+
+    h1 {
+        color:rgb(99, 32, 82);
+        font-style: oblique;
+    }
+}
+
+</style>

@@ -1,13 +1,24 @@
-<style> 
+
+:root{
+    --sidebar_width: 200px;
+}
 
 body {
     background-color: #232030;
     color: white;
+    min-height: 100vh;
+    margin:0;
+    display: flex;
+    flex-direction: column;
 }
 
 header {
     background-color: darkorange;
     text-align: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    margin:0;
+    
 
     h1 {
         color:rgb(99, 32, 82);
@@ -15,4 +26,120 @@ header {
     }
 }
 
-</style>
+.layout {
+    flex: 1;
+    display: flex;
+}
+
+/* The side navigation menu */
+.sidebar {
+  margin: 0;
+  padding: 0;
+  width: var(--sidebar_width);
+  background-color: #161b18;
+}
+
+/* Sidebar links */
+.sidebar a {
+  display: block;
+  color: rgb(209, 209, 209);
+  padding: 16px;
+  text-decoration: none;
+}
+
+/* Active/current link */
+.sidebar a.active {
+  background-color: #0b0f08;
+  color: rgb(255, 255, 255);
+}
+
+/* Links on mouse-over */
+.sidebar a:hover:not(.active) {
+  background-color: #555;
+  color: white;
+}
+
+.main {
+    flex:1;
+    display: flex;
+}
+
+.chat {
+    flex: 1;
+    background-color:#14121f ;
+    margin: 20px;
+    padding: 10px;
+    border: 3px solid rgb(67, 74, 95);
+    border-radius: 5px;
+    gap:8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.messageout {
+    border: 4px solid rgb(102, 102, 102);
+    border-radius: 10px;
+    padding: 6px;
+    align-self: flex-end;
+    width: fit-content;
+    max-width: 70%;
+    text-align:right;
+    background-color: #555;
+    white-space: pre-wrap;
+
+}
+
+.messagein {
+    border: 4px solid rgb(102, 102, 102);
+    border-radius: 10px;
+    padding: 6px;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 70%;
+    text-align: left;
+    background-color:rgb(29, 27, 28) ;
+    white-space: pre-wrap;
+}
+
+.messages {
+    flex: 1;
+    overflow-y: scroll;
+    max-height: 65vh;
+    display: flex;
+    flex-direction: column;
+    gap:8px;
+    min-height: 0;
+}
+
+.messages > :first-child {
+    margin-top: auto;
+}
+
+.textField{
+    display: flex;
+    flex-direction: row;
+    gap:5px;
+
+    button {
+        color: rgb(155, 241, 155);
+        background-color: #0c0f16;
+        border-radius:10px;
+        flex: 1;
+        margin: 5px;
+    }
+    button:hover{
+        color: rgb(255, 255, 255);
+        background-color: #222a3d;
+    }
+}
+
+textarea {
+    flex: 5;
+    resize: none;
+    font: inherit;
+    max-height: 200px;
+    color:white;
+    background-color: #0b0f08;
+    border-radius: 10px;
+
+}

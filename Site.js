@@ -112,8 +112,6 @@ server.on("request",(req,res) => {
             console.log("posted");
             console.log(req.url);
             console.log(body);
-            console.log(req);
-            console.log(req.headers);
             let chatTitle = handleMessage(body,req.url.replace("/",""),Number(req.headers.timestamp),"user");
             res.statusCode=200;
             res.setHeader("Content-Type","text/plain");
@@ -164,7 +162,6 @@ server.on("request",(req,res) => {
 
             // sorting the list
             returnList.sort(function(a,b){return b.timestamp - a.timestamp});
-            console.log(returnList); // log so I can confirm
 
             //Building the response
             res.statusCode=200;

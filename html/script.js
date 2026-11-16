@@ -22,11 +22,23 @@ async function getChatData() { ///fetch chat messages
     return await res.json();
 }
 
+async function getChatList() {
+        let res = await fetch(window.location.href,{ ////get request to server
+        method:'GET',
+        headers:{
+            "datafetch":"chats"
+        }
+    });
+    return await res.json();
+}
+
 
 async function updateChat(){
     let chatData = await getChatData(); /// fetch the chat
 
     let messageboard = document.getElementById("messageboard"); //// the message board div
+
+    messageboard.replaceChildren();
 
 
     //------Construct the chat
@@ -38,6 +50,26 @@ async function updateChat(){
         messageboard.appendChild(div);
     }
     scrollMessageDown();
+}
+
+
+async function updateChatList() {
+    let list = await getChatList();
+    const localpath = window.location.pathname;
+    const sidebar = document.getElementById("sidebar");
+    if(localpath == "/"){
+        const newChatLink = document.getElementById("new_chat");
+        newChatLink.className = "active";
+    }
+    for(const object of list){
+        const link = document.createElement("a");
+        if(["/",object.dir].join("") == localpath){
+            link.className = "active";
+        }
+        link.href = [window.location.origin,"/",object.dir].join("");
+        link.textContent = object.name;
+        sidebar.appendChild(link);
+    }
 }
 
 
@@ -86,5 +118,9 @@ async function sendMsg() {
 if(location.pathname !== "/"){
     updateChat();
 }
+
+setInterval(updateChat,2000);
+
+updateChatList();
 
 sendbutton.onclick = sendMsg;

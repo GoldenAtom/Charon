@@ -4,6 +4,7 @@ const { createServer } = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { send } = require('node:process');
+const { dir } = require('node:console');
 
 const hostname = '127.0.0.1';
 const port = 3000;
@@ -131,17 +132,45 @@ server.on("request",(req,res) => {
         if(headerValue === "messages"){ // if the client requests the messages in a chat
             // fetch chat data
             let chatDir = req.url.replace("/","");
-            let chat = JSON.parse(fs.readFileSync(path.join(__dirname,"data","chats",[chatDir,".json"].join("")),"utf-8"));
-            let messages = chat.messages;
+            let messages = []; // declare messages list
+            if(chatDir ==""){res.statusCode=200;res.setHeader("Content-Type","application/json");res.write("[]");res.end();return;} /// return nothing if no chat has been requested (New chat page)
+
+            ///try fetching data
+            try {
+                const chat = JSON.parse(fs.readFileSync(path.join(__dirname,"data","chats",[chatDir,".json"].join("")),"utf-8"));
+                messages = chat.messages;
+            } catch {
+                console.log("File read failed when attempring to send chat data for chat ",chatDir);
+            }
 
             //Building the response
             res.statusCode=200;
-            res.setHeader("Content-Type","application.json");
+            res.setHeader("Content-Type","application/json");
             res.write(JSON.stringify(messages));
-            res.end()
+            res.end();
 
         } else if (headerValue == "chats"){ /// if the client requests list of chats
 
+            let chatsList = fs.readdirSync(path.join(__dirname,"data","chats"),"utf-8"); /// check for saved chats
+            let returnList = [];
+            for(const dirs of chatsList){ // iterate trough saved chats adding the relevant data to the list
+                let chat = JSON.parse(fs.readFileSync(path.join(__dirname,"data","chats",dirs),"utf-8"));
+                returnList.push({ //object containing the relevant data
+                    name:chat.readable_title,
+                    dir:chat.title,
+                    timestamp:chat.last_interact
+                });
+            }
+
+            // sorting the list
+            returnList.sort(function(a,b){return b.timestamp - a.timestamp});
+            console.log(returnList); // log so I can confirm
+
+            //Building the response
+            res.statusCode=200;
+            res.setHeader("Content-Type","application/json");
+            res.write(JSON.stringify(returnList));
+            res.end();
         }
         return;
     }

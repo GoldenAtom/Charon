@@ -78,12 +78,12 @@ function handleMessage(message,dir,timestamp,sender){
 
     ////// append new msg
 
-    let msg = ["(",dateFormat.format(timestamp),")  ",sender," : ",message].join("");
     let msgObject = {
         index:data.messages.length,
         sender:sender,
         timestamp:timestamp,
-        text:msg,
+        readable_timestamp:dateFormat.format(timestamp),
+        text:message,
     }
     data.messages.push(msgObject);
 

@@ -44,10 +44,17 @@ async function updateChat(){
     //------Construct the chat
     let chatHtmlString = "" 
     for(const message of chatData){
+        /// add message 
         const div = document.createElement("div");
         div.className = message.sender === "user" ? "messageout" : "messagein";
         div.textContent = message.text;
         messageboard.appendChild(div);
+
+        /// add timestamp
+        const M_timestamp = document.createElement("div"); 
+        M_timestamp.className = "timestamp";
+        M_timestamp.textContent = message.readable_timestamp;
+        div.appendChild(M_timestamp);
     }
     scrollMessageDown();
 }

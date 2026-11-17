@@ -3,16 +3,21 @@
 const { createServer } = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { time } = require('node:console');
+const { setTimeout: sleep } = require("node:timers/promises");
 
 const hostname = '127.0.0.1';
 const port = 3000;
 
-var codeFiles = {
+const charonName = "model";
+
+var codeFiles = { /// its kinda just become files now
     head : {path:"/html/head.html",data:""},
     header: {path:"html/header.html",data:""},
     body: {path:"html/body.html",data:""},
     style: {path:"html/style.css",data:""},
     javascript : {path:"html/script.js",data:""},
+    systemprompt : {path:"prompts/systemprompt.txt",data:""},
 }
 
 function refreshFiles(){ // function to allow for refreshing of files on the go
@@ -125,20 +130,28 @@ function addAgentMSGflag(dir){
 
     let msgObject = {
         index:data.messages.length,
-        sender:"charon",
+        sender:charonName,
         timestamp:timestamp,
         readable_timestamp:dateFormat.format(timestamp),
         text:"Charon is pondering",
     }
     const newlen = data.messages.push(msgObject);
 
-    data.latest_sender = "charon";
+    data.latest_sender = charonName;
 
     data.last_interact = Date.now();
 
     fs.writeFileSync(path.join(__dirname,"data","chats",[data.title,".json"].join("")),JSON.stringify(data));
 
     return newlen-1;
+}
+
+function resolveFlag(index,OldchatObject,msg){
+    console.log(msg,"-------in resolve flag")
+    let chat = JSON.parse(fs.readFileSync(path.join(__dirname,"data","chats",[OldchatObject.title,".json"].join("")),"utf-8"));
+    chat.messages[index].text = msg;
+    fs.writeFileSync(path.join(__dirname,"data","chats",[OldchatObject.title,".json"].join("")),JSON.stringify(chat));
+    return;
 }
 
 
@@ -255,6 +268,113 @@ refreshFiles();
 ///// ========= Agent Handling =============
 let agentBusy = false;
 
+const ContextLength = 8192;
+const responseReserve = 1024;
+const tolerance = 256;
+const chatAllocation = 1024;
+
+let models = {
+    thePublicVoice:{
+        model:"gemma3:4b",
+        maxContext:8192,
+        formattingStyle:"gemma3",
+    },
+};
+
+
+function estimateTokens(text) { /// make a guess
+    return Math.ceil(text.length / 4);
+}
+
+async function fetchMaxTokenLength(model) { ////ping ollama api to get the token limits of models in use
+    try {
+        const res = await fetch("http://localhost:11434/api/show",{
+            method:"POST",
+            headers:{"Content-Type":"Application/json"},
+            body: JSON.stringify({model:model.model})
+        });
+    const info = await res.json();
+    const modelContextLength = Object.entries(info.model_info).find(([key]) => key.endsWith(".context_length"))?.[1];
+    return modelContextLength;
+    }
+    catch(err) {
+        console.log("error fetching context length for model ",model.model," error ", err);
+    }
+    return 0;
+}
+
+async function updateModelsMaxTokenLengths() { // update the models list
+    for(const [name,model] of Object.entries(models)){
+        model.maxContext = await fetchMaxTokenLength(model);
+        console.log("updated model context length",model);
+    }
+}
+updateModelsMaxTokenLengths(); // intitate the update once at startup
+
+
+/// ------ Prompt construction site ===> Hardhats and Appropriate PPE mandatory
+
+function formatMSG(formattingStyle,msg,sender){
+    let returnString = "";
+    if(formattingStyle=="gemma3"){
+        returnString = `<start_of_turn>${sender}
+${msg}
+<end_of_turn>`;
+    } else {
+        console.warn("Couldnt format message due to some airhead picking a nonexisting model target");
+    }
+    return returnString;
+}
+
+function cutCost(expenses,budget){ /// hard budgeting
+    let expensesCopy = [...expenses];
+    let timesCut = 0;
+    while (expensesCopy.length > 0 && estimateTokens(expensesCopy.join(""))>budget){
+        expensesCopy.shift();
+        timesCut++;
+    }
+    if(timesCut > 0){console.log(`Had to cut cost ${timesCut} times to accomodate context window`);}
+    return expensesCopy;
+}
+
+function makeChatHistory(chat,model){
+    let chatlist = []
+    for(const msg of chat.messages){
+        chatlist.push(formatMSG(model.formattingStyle,msg.text,msg.sender));
+    }
+
+    if(model.formattingStyle =="gemma3"){
+        chatlist.push(`<start_of_turn>${charonName}`);
+    }
+
+    return chatlist;
+}
+
+function calculateBudget(model){
+    let absoluteContextLimit = Math.min(model.ContextLength,ContextLength);
+    return absoluteContextLimit - responseReserve - tolerance;
+}
+
+function buildPrompt(model,mandatoryContext,context,chat){
+    let budget = calculateBudget(model); /// finding context limit
+    budget -= estimateTokens(mandatoryContext.join("")); // recalculate budget with mandatory context in mind
+
+    if (budget < 0) { /// if someone di a oppsie
+    throw new Error("Mandatory context exceeds model token budget");
+    }
+
+    let sanitisedContext = cutCost(context,budget-chatAllocation).join(""); /// making sure context is within token limit aswell as making room for the chat history
+    budget -= estimateTokens(sanitisedContext);
+
+    /// making chat history
+    let ChatHistory = cutCost(makeChatHistory(chat,model),budget).join(""); // make chat history and also cut cost to make sure it fits well
+    
+    return [mandatoryContext.join(""),sanitisedContext,ChatHistory].join(""); // hand the hopefully finshed product over to the next stage
+}
+
+
+
+
 function agentsTurn(chat){return chat.latest_sender === "user" ? true : false;} // I know teniary (or wathever its called) is uneccessary here asking if condition is true return true, but Its a nice note on how it works so Ill keep it
 
 function checkChats(){
@@ -264,7 +384,7 @@ function checkChats(){
 
     for(const names of chat_keys){ // get the actual chats
         try{
-            chats.push(fs.readFileSync(path.join(__dirname,"data","chats",names),"utf-8"));
+            chats.push(JSON.parse(fs.readFileSync(path.join(__dirname,"data","chats",names),"utf-8")));
         } catch {
             console.log("Ops developed dyslexia reading chat ",names);
         }
@@ -281,15 +401,48 @@ function checkChats(){
 }
 
 
-function doCharon(){ /// yes sexually ;3
-    const UndoneDeeds = checkChats(); /// check for chats to act on
-    if(UndoneDeeds.length < 1){console.log("no deeds undone");return true;} /// no chats yippee!
-    if(UndoneDeeds.length > 1){console.log("too many deeds to do :(")} /// overworked, not yippee D:
+///// ___________________ ASK FOR FUCKS SAKE ___________________________ AAAAAAAAAHHHHHHHHHHHHHHHHHHHH WHY ISNT IT WOKRING D: 
+async function askModel(model,prompt){
+    fs.writeFileSync(path.join(__dirname,"logs","latest_prompt.log"),prompt);
 
-    const todaysDeed = UndoneDeeds[0];
+    let res = await fetch("http://localhost:11434/api/generate",{ // ping ollama
+        method:"POST",
+        headers:{
+            "Content-Type":"Application/json"
+        },
+        body:JSON.stringify({
+            model:model.model,
+            prompt:prompt,
+            stream:false,
+            raw:true,
+            keep_alive:0
+        })
+    });
+    let ollamaResponse = await res.json(); // wait for daddy to be done in the phone
+    if(!ollamaResponse.done){console.warn("Ollama couldnt complete response for whatever reason");console.log("Response is as follows ",ollamaResponse)} /// oh fuck he got a stroke
 
-
+    console.log(ollamaResponse.response);
+    return ollamaResponse.response;
 }
+
+
+
+///////// ================= Main ai loop ================
+
+    async function doCharon(){ /// yes sexually ;3
+        const UndoneDeeds = checkChats(); /// check for chats to act on
+        if(UndoneDeeds.length < 1){console.log("no deeds undone");return true;} /// no chats yippee!
+        if(UndoneDeeds.length > 1){console.log("too many deeds to do :(")} /// overworked, not yippee D:
+
+        const todaysDeed = UndoneDeeds[0];
+        const flagIndex = addAgentMSGflag(todaysDeed.title);
+        const prompt=buildPrompt(models.thePublicVoice,[codeFiles.systemprompt.data],[],todaysDeed);
+        const modelReply = await askModel(models.thePublicVoice,prompt);
+        resolveFlag(flagIndex,todaysDeed,modelReply);
+
+        console.log("did a deed");
+        return;
+    }
 
 
 async function checkOllama(){
@@ -299,7 +452,7 @@ async function checkOllama(){
 }
 checkOllama();
 
-async function testModel() {
+async function testModel() {  /////// Debug function to see if I could communicate with ollama models. keep around for an example of the api
     const model = "gemma3:4b";
     let res = await fetch("http://localhost:11434/api/generate",{
         method:"POST",
@@ -323,4 +476,12 @@ async function testModel() {
         console.log(await res.json());
     }
 }
-testModel();
+
+async function loopCharon() {
+    while (true) {
+        await doCharon();
+
+        await sleep(3000);
+    }
+}
+loopCharon();

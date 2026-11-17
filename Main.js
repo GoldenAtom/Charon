@@ -298,3 +298,29 @@ async function checkOllama(){
     console.log(res.ok ? "Ollama looking soo very fine":"OLLAMA IS NOT DOING TO WELL");
 }
 checkOllama();
+
+async function testModel() {
+    const model = "gemma3:4b";
+    let res = await fetch("http://localhost:11434/api/generate",{
+        method:"POST",
+        headers:{
+            "Content-Type":"Application/json"
+        },
+        body:JSON.stringify({
+            model:model,
+            prompt:"This is a test please reply with banana and a sentence of your choice",
+            stream:false,
+            raw:true,
+            keep_alive:0
+        })
+
+    });
+    if(res.ok){
+        console.log(await res.json());
+    } else{
+        console.log("RES NO BUENO");
+        console.log(res);
+        console.log(await res.json());
+    }
+}
+testModel();

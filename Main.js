@@ -3,8 +3,6 @@
 const { createServer } = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { send } = require('node:process');
-const { dir } = require('node:console');
 
 const hostname = '127.0.0.1';
 const port = 3000;
@@ -94,6 +92,53 @@ function handleMessage(message,dir,timestamp,sender){
     fs.writeFileSync(path.join(__dirname,"data","chats",[data.title,".json"].join("")),JSON.stringify(data));
 
     return data.title;
+}
+
+function addAgentMSGflag(dir){
+
+    const timestamp = Date.now();
+
+    ///// fetch chat data
+    let data = "";
+    if (!(dir==="")){
+        try {
+            data = fs.readFileSync(path.join(__dirname,"data","chats",[dir,".json"].join("")),"utf-8");
+            console.log("did file read");
+        } catch(error) {
+            data = ""
+            console.log(error);
+
+        }
+    }
+
+    if(data==""){
+        data = createMSGFileTemplate(Date.now().toString());
+    } else {
+        try {
+            data=JSON.parse(data);
+        } catch {
+            return console.error("Failed to parse json");
+        }
+    }
+
+    ////// append new msg
+
+    let msgObject = {
+        index:data.messages.length,
+        sender:"charon",
+        timestamp:timestamp,
+        readable_timestamp:dateFormat.format(timestamp),
+        text:"Charon is pondering",
+    }
+    const newlen = data.messages.push(msgObject);
+
+    data.latest_sender = "charon";
+
+    data.last_interact = Date.now();
+
+    fs.writeFileSync(path.join(__dirname,"data","chats",[data.title,".json"].join("")),JSON.stringify(data));
+
+    return newlen-1;
 }
 
 
@@ -190,7 +235,7 @@ server.on("request",(req,res) => {
     res.write(codeFiles.body.data);// write body
 
     res.write("<script>"); //init javascript
-    res.write(codeFiles.javascript.data); // instest javascript
+    res.write(codeFiles.javascript.data); // insert javascript
     res.write("</script>"); //close script section
 
     res.write("\n</body>"); // close body
@@ -205,3 +250,51 @@ fs.watch(path.join(__dirname,"html"), () =>{
 console.log("change detected, refreshing active files");
 refreshFiles();
 });
+
+
+///// ========= Agent Handling =============
+let agentBusy = false;
+
+function agentsTurn(chat){return chat.latest_sender === "user" ? true : false;} // I know teniary (or wathever its called) is uneccessary here asking if condition is true return true, but Its a nice note on how it works so Ill keep it
+
+function checkChats(){
+    let chat_keys = fs.readdirSync(path.join(__dirname,"data","chats"),"utf-8"); /// fetch all chat names
+    let chats = [];
+    let unPocessed = [];
+
+    for(const names of chat_keys){ // get the actual chats
+        try{
+            chats.push(fs.readFileSync(path.join(__dirname,"data","chats",names),"utf-8"));
+        } catch {
+            console.log("Ops developed dyslexia reading chat ",names);
+        }
+    }
+
+    /// now iterate trough the chats to see which needs attention
+    for(const chat of chats){
+        if(agentsTurn(chat)){
+            unPocessed.push(chat);
+        }
+    }
+    unPocessed.sort(function(a,b){return b.last_interact - a.last_interact});
+    return unPocessed;
+}
+
+
+function doCharon(){ /// yes sexually ;3
+    const UndoneDeeds = checkChats(); /// check for chats to act on
+    if(UndoneDeeds.length < 1){console.log("no deeds undone");return true;} /// no chats yippee!
+    if(UndoneDeeds.length > 1){console.log("too many deeds to do :(")} /// overworked, not yippee D:
+
+    const todaysDeed = UndoneDeeds[0];
+
+
+}
+
+
+async function checkOllama(){
+    let res;
+    try{res = await fetch("http://127.0.0.1:11434/api/version");} catch {console.log("ollama fetch failed it probably killed itself witnessing these horrors"); return;}
+    console.log(res.ok ? "Ollama looking soo very fine":"OLLAMA IS NOT DOING TO WELL");
+}
+checkOllama();

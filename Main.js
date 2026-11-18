@@ -351,7 +351,7 @@ function makeChatHistory(chat,model){
 }
 
 function calculateBudget(model){
-    let absoluteContextLimit = Math.min(model.ContextLength,ContextLength);
+    let absoluteContextLimit = Math.min(model.maxContext,ContextLength);
     return absoluteContextLimit - responseReserve - tolerance;
 }
 
@@ -453,7 +453,7 @@ async function checkOllama(){
 checkOllama();
 
 async function testModel() {  /////// Debug function to see if I could communicate with ollama models. keep around for an example of the api
-    const model = "gemma3:4b";
+    const model = "gemma3:12b";
     let res = await fetch("http://localhost:11434/api/generate",{
         method:"POST",
         headers:{

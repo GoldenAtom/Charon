@@ -3,6 +3,8 @@ data/
 .env
 .env.*
 !.env.example
+prompts/*.txt
+!prompts/*.example.txt
 
 #Hope I never need this
 node_modules/

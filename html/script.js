@@ -32,17 +32,17 @@ async function getChatList() {
     return await res.json();
 }
 
-
+let oldChatData = [];
 async function updateChat(){
     let chatData = await getChatData(); /// fetch the chat
+    if(JSON.stringify(chatData) === JSON.stringify(oldChatData)){return;}
+    oldChatData = chatData;
 
     let messageboard = document.getElementById("messageboard"); //// the message board div
 
     messageboard.replaceChildren();
 
-
     //------Construct the chat
-    let chatHtmlString = "" 
     for(const message of chatData){
         /// add message 
         const div = document.createElement("div");
